@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authFilesApi } from '@/services/api';
+import { fetchOpencodeGoCredentials } from '@/services/api/opencodeGoQuota';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IconSearch, IconX } from '@/components/ui/icons';
@@ -120,9 +121,13 @@ export function QuotaPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await authFilesApi.list();
+      // Go keys live in the compatibility config, not the auth-files list.
+      const [data, goCredentials] = await Promise.all([
+        authFilesApi.list(),
+        fetchOpencodeGoCredentials(),
+      ]);
       if (!isCurrent()) return;
-      setFiles(data?.files || []);
+      setFiles([...(data?.files || []), ...goCredentials]);
       setFilesGeneration(sessionGeneration);
     } catch (err: unknown) {
       if (!isCurrent()) return;
@@ -151,6 +156,7 @@ export function QuotaPage() {
   const devinQuota = useQuotaStore((state) => state.devinQuota);
   const kimiQuota = useQuotaStore((state) => state.kimiQuota);
   const metaQuota = useQuotaStore((state) => state.metaQuota);
+  const opencodeGoQuota = useQuotaStore((state) => state.opencodeGoQuota);
   const pluginQuota = useQuotaStore((state) => state.pluginQuota);
   const xaiQuota = useQuotaStore((state) => state.xaiQuota);
 
@@ -163,6 +169,7 @@ export function QuotaPage() {
         devin: devinQuota,
         kimi: kimiQuota,
         meta: metaQuota,
+        'opencode-go': opencodeGoQuota,
         plugin: pluginQuota,
         xai: xaiQuota,
       }) as unknown as Record<QuotaProviderType, Record<string, QuotaCardState>>,
@@ -173,6 +180,7 @@ export function QuotaPage() {
       devinQuota,
       kimiQuota,
       metaQuota,
+      opencodeGoQuota,
       pluginQuota,
       xaiQuota,
     ]

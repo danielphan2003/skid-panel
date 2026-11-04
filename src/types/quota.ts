@@ -523,3 +523,25 @@ export interface XaiQuotaState {
   error?: string;
   errorStatus?: number;
 }
+
+// OpenCode Go usage limits (GET https://opencode.ai/zen/go/v1/usage)
+export interface OpencodeGoQuotaWindow {
+  /** 'five-hour' | 'weekly' | 'monthly' */
+  id: string;
+  /** English label, for views that do not translate (the timeline's limit list). */
+  label: string;
+  labelKey: string;
+  /** Percent of the window used, 0..100. */
+  usedPercent: number | null;
+  /** Reset instant in epoch ms; null when the payload carried none. */
+  resetAtMs: number | null;
+  /** Window length in hours; null for the billing month, whose length varies. */
+  periodHours: number | null;
+}
+
+export interface OpencodeGoQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  windows: OpencodeGoQuotaWindow[];
+  error?: string;
+  errorStatus?: number;
+}

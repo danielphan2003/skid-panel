@@ -24,6 +24,7 @@ const WEEK_HOURS = 168;
 const HEADLINE_LIMIT_IDS: Partial<Record<QuotaProviderType, string>> = {
   claude: 'seven-day',
   codex: 'weekly',
+  'opencode-go': 'weekly',
 };
 
 const clampPercent = (value: number) => Math.min(100, Math.max(0, value));
@@ -110,6 +111,7 @@ export function quotaLimits(
   switch (provider) {
     case 'claude':
     case 'codex':
+    case 'opencode-go':
       return fromUsedWindows((quota as { windows?: UsedWindow[] }).windows ?? [], t);
 
     case 'devin':

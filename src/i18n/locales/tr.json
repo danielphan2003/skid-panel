@@ -441,7 +441,8 @@
     "quota_refresh_single": "Kotayı Yenile",
     "quota_refresh_hint": "Yalnızca Bu Kimlik Bilgisinin Kotasını Yenile",
     "quota_refresh_success": "“{{name}}” için Kota Yenilendi",
-    "quota_refresh_failed": "“{{name}}” için Kota Yenilenemedi: {{message}}"
+    "quota_refresh_failed": "“{{name}}” için Kota Yenilenemedi: {{message}}",
+    "filter_opencode-go": "OpenCode Go"
   },
   "antigravity_subscription": {
     "plan_unknown": "Bilinmiyor",
@@ -2500,5 +2501,24 @@
     "drain_chart_label": "Saatlik havuz kotası tüketimi, en yüksek {{peak}}%/sa",
     "plugin_missing": "Kota geçmişi için proxy'de quota-ledger eklentisi gerekir:",
     "history_failed": "Kota geçmişi yüklenemedi."
+  },
+  "opencode_go_quota": {
+    "title": "OpenCode Go",
+    "idle": "Click to load OpenCode Go usage limits",
+    "loading": "Loading OpenCode Go usage...",
+    "load_failed": "Failed to load OpenCode Go usage: {{message}}",
+    "empty_title": "No OpenCode Go key",
+    "empty_desc": "Add an OpenCode Go key as an OpenAI-compatible provider to see its usage limits",
+    "empty_data": "OpenCode Go returned no usage limits",
+    "fetch_all": "Fetch all",
+    "refresh_button": "Refresh",
+    "missing_auth_index": "This OpenCode Go key has no auth index",
+    "stale_request": "The quota cache changed while loading; try again",
+    "unauthorized": "OpenCode Go rejected this key (expired or not a Go key)",
+    "plan_label": "Plan",
+    "plan_value": "Go",
+    "window_rolling": "Session (5h)",
+    "window_weekly": "Weekly",
+    "window_monthly": "Monthly"
   }
 }

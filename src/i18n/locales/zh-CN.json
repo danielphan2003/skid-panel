@@ -439,7 +439,8 @@
     "quota_refresh_single": "刷新额度",
     "quota_refresh_hint": "仅刷新该认证文件的额度",
     "quota_refresh_success": "已刷新 \"{{name}}\" 的额度",
-    "quota_refresh_failed": "刷新 \"{{name}}\" 的额度失败：{{message}}"
+    "quota_refresh_failed": "刷新 \"{{name}}\" 的额度失败：{{message}}",
+    "filter_opencode-go": "OpenCode Go"
   },
   "antigravity_subscription": {
     "plan_unknown": "未知",
@@ -2498,5 +2499,24 @@
     "drain_chart_label": "额度池每小时消耗，峰值 {{peak}}%/小时",
     "plugin_missing": "额度历史需要代理安装 quota-ledger 插件：",
     "history_failed": "无法加载额度历史。"
+  },
+  "opencode_go_quota": {
+    "title": "OpenCode Go",
+    "idle": "Click to load OpenCode Go usage limits",
+    "loading": "Loading OpenCode Go usage...",
+    "load_failed": "Failed to load OpenCode Go usage: {{message}}",
+    "empty_title": "No OpenCode Go key",
+    "empty_desc": "Add an OpenCode Go key as an OpenAI-compatible provider to see its usage limits",
+    "empty_data": "OpenCode Go returned no usage limits",
+    "fetch_all": "Fetch all",
+    "refresh_button": "Refresh",
+    "missing_auth_index": "This OpenCode Go key has no auth index",
+    "stale_request": "The quota cache changed while loading; try again",
+    "unauthorized": "OpenCode Go rejected this key (expired or not a Go key)",
+    "plan_label": "Plan",
+    "plan_value": "Go",
+    "window_rolling": "Session (5h)",
+    "window_weekly": "Weekly",
+    "window_monthly": "Monthly"
   }
 }
