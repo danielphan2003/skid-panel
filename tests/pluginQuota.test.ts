@@ -68,7 +68,8 @@ describe('generic plugin quota', () => {
   });
 
   test('keeps built-in quota cards when a plugin also advertises quota', () => {
-    const builtIns = QUOTA_TAB_ORDER.filter((type) => type !== 'plugin');
+    // OpenCode Go comes from the compatibility config, never the auth-files list.
+    const builtIns = QUOTA_TAB_ORDER.filter((type) => type !== 'plugin' && type !== 'opencode-go');
     expect([...BUILT_IN_QUOTA_PROVIDERS].sort()).toEqual([...builtIns].sort());
     for (const type of builtIns) {
       for (const capability of [

@@ -441,7 +441,8 @@
     "quota_refresh_single": "Refresh quota",
     "quota_refresh_hint": "Refresh quota only for this credential",
     "quota_refresh_success": "Quota refreshed for \"{{name}}\"",
-    "quota_refresh_failed": "Failed to refresh quota for \"{{name}}\": {{message}}"
+    "quota_refresh_failed": "Failed to refresh quota for \"{{name}}\": {{message}}",
+    "filter_opencode-go": "OpenCode Go"
   },
   "antigravity_subscription": {
     "plan_unknown": "Unknown",
@@ -2500,5 +2501,24 @@
     "drain_chart_label": "Pooled quota drain per hour over time, peak {{peak}}% per hour",
     "plugin_missing": "Quota history needs the quota-ledger plugin on the proxy:",
     "history_failed": "Quota history could not be loaded."
+  },
+  "opencode_go_quota": {
+    "title": "OpenCode Go",
+    "idle": "Click to load OpenCode Go usage limits",
+    "loading": "Loading OpenCode Go usage...",
+    "load_failed": "Failed to load OpenCode Go usage: {{message}}",
+    "empty_title": "No OpenCode Go key",
+    "empty_desc": "Add an OpenCode Go key as an OpenAI-compatible provider to see its usage limits",
+    "empty_data": "OpenCode Go returned no usage limits",
+    "fetch_all": "Fetch all",
+    "refresh_button": "Refresh",
+    "missing_auth_index": "This OpenCode Go key has no auth index",
+    "stale_request": "The quota cache changed while loading; try again",
+    "unauthorized": "OpenCode Go rejected this key (expired or not a Go key)",
+    "plan_label": "Plan",
+    "plan_value": "Go",
+    "window_rolling": "Session (5h)",
+    "window_weekly": "Weekly",
+    "window_monthly": "Monthly"
   }
 }

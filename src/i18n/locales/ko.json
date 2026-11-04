@@ -441,7 +441,8 @@
     "quota_refresh_single": "할당량 새로 고침",
     "quota_refresh_hint": "이 자격 증명의 할당량만 새로 고침합니다",
     "quota_refresh_success": "\"{{name}}\"의 할당량을 새로 고쳤습니다",
-    "quota_refresh_failed": "\"{{name}}\"의 할당량 새로 고침 실패: {{message}}"
+    "quota_refresh_failed": "\"{{name}}\"의 할당량 새로 고침 실패: {{message}}",
+    "filter_opencode-go": "OpenCode Go"
   },
   "antigravity_subscription": {
     "plan_unknown": "알 수 없음",
@@ -2500,5 +2501,24 @@
     "drain_chart_label": "시간당 통합 할당량 소진, 최고 {{peak}}%/시간",
     "plugin_missing": "할당량 기록에는 프록시의 quota-ledger 플러그인이 필요합니다:",
     "history_failed": "할당량 기록을 불러오지 못했습니다."
+  },
+  "opencode_go_quota": {
+    "title": "OpenCode Go",
+    "idle": "Click to load OpenCode Go usage limits",
+    "loading": "Loading OpenCode Go usage...",
+    "load_failed": "Failed to load OpenCode Go usage: {{message}}",
+    "empty_title": "No OpenCode Go key",
+    "empty_desc": "Add an OpenCode Go key as an OpenAI-compatible provider to see its usage limits",
+    "empty_data": "OpenCode Go returned no usage limits",
+    "fetch_all": "Fetch all",
+    "refresh_button": "Refresh",
+    "missing_auth_index": "This OpenCode Go key has no auth index",
+    "stale_request": "The quota cache changed while loading; try again",
+    "unauthorized": "OpenCode Go rejected this key (expired or not a Go key)",
+    "plan_label": "Plan",
+    "plan_value": "Go",
+    "window_rolling": "Session (5h)",
+    "window_weekly": "Weekly",
+    "window_monthly": "Monthly"
   }
 }

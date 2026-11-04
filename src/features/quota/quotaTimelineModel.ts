@@ -421,16 +421,16 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
 
   if (!quota || quota.status !== 'success') return empty;
 
-  if (provider === 'claude' || provider === 'codex') {
+  if (provider === 'claude' || provider === 'codex' || provider === 'opencode-go') {
     const windows = ((quota as { windows?: WindowLike[] }).windows ?? []).filter(
       (window) => typeof window.resetAtMs === 'number'
     );
     const sessionView = maxPeriodHours !== undefined && maxPeriodHours <= SESSION_PERIOD_HOURS;
     const accountWindowId = sessionView
       ? 'five-hour'
-      : provider === 'codex'
-        ? 'weekly'
-        : 'seven-day';
+      : provider === 'claude'
+        ? 'seven-day'
+        : 'weekly';
     // Both providers can report model-scoped windows with the same period as
     // the account window (Codex Spark weekly, Claude Opus/Sonnet/Fable 7-day).
     // A reset-time tie-break would make the lane silently switch to that
