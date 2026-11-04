@@ -143,7 +143,9 @@ export function averageDrain(
   nowMs: number,
   windowMs: number
 ): number | null {
-  return drainBetween(intervalsOf(samples, filter), nowMs - windowMs, nowMs, HOUR_MS);
+  // A window shorter than two hours needs only half of itself measured.
+  const minMeasuredMs = Math.min(HOUR_MS, windowMs / 2);
+  return drainBetween(intervalsOf(samples, filter), nowMs - windowMs, nowMs, minMeasuredMs);
 }
 
 /**
@@ -220,14 +222,27 @@ function coveredMs(intervals: readonly Consumption[]): number {
   return total;
 }
 
+export interface ForecastReset {
+  at: number;
+  /** Percent the pool gains at this reset. */
+  gain: number;
+  /** Pool remaining right after the reset. */
+  value: number;
+}
+
 export interface PoolForecast {
   points: ChartPoint[];
   /** First instant the pool reaches zero inside the horizon. */
   emptyAtMs: number | null;
+  /** First credential to reach zero inside the horizon. */
+  firstEmpty: { at: number; auth: string } | null;
   nextReset: { at: number; gain: number } | null;
+  /** Every reset inside the horizon that gains at least rounding noise, oldest first. */
+  resets: ForecastReset[];
 }
 
 interface SimulatedMember {
+  auth: string;
   remaining: number;
   resetAtMs: number | null;
   periodMs: number;
@@ -249,6 +264,7 @@ export function forecastPool(
   stepMs: number
 ): PoolForecast {
   const simulated: SimulatedMember[] = members.map((member) => ({
+    auth: member.auth,
     remaining: member.remaining,
     resetAtMs: member.resetAtMs,
     periodMs: (member.periodHours ?? DEFAULT_PERIOD_HOURS) * HOUR_MS,
@@ -256,7 +272,10 @@ export function forecastPool(
   const total = () => simulated.reduce((sum, member) => sum + member.remaining, 0);
   const points: ChartPoint[] = [{ at: nowMs, value: total() }];
   let emptyAtMs: number | null = total() <= 0 ? nowMs : null;
+  const emptyNow = simulated.find((member) => member.remaining <= 0);
+  let firstEmpty: PoolForecast['firstEmpty'] = emptyNow ? { at: nowMs, auth: emptyNow.auth } : null;
   let nextReset: PoolForecast['nextReset'] = null;
+  const gains: { at: number; gain: number }[] = [];
   const drainPerStep = Math.max(0, drainPerHour) * (stepMs / HOUR_MS);
 
   for (let at = nowMs + stepMs; at <= nowMs + horizonMs; at += stepMs) {
@@ -264,8 +283,9 @@ export function forecastPool(
       while (member.resetAtMs !== null && member.resetAtMs <= at) {
         const gain = 100 - member.remaining;
         const resetAt = Math.max(member.resetAtMs, nowMs);
-        if (gain >= RESET_RISE && (nextReset === null || resetAt < nextReset.at)) {
-          nextReset = { at: resetAt, gain };
+        if (gain >= RESET_RISE) {
+          gains.push({ at: resetAt, gain });
+          if (nextReset === null || resetAt < nextReset.at) nextReset = { at: resetAt, gain };
         }
         member.remaining = 100;
         member.resetAtMs += member.periodMs;
@@ -281,6 +301,9 @@ export function forecastPool(
       const taken = Math.min(member.remaining, drain);
       member.remaining -= taken;
       drain -= taken;
+      if (firstEmpty === null && taken > 0 && member.remaining <= 0) {
+        firstEmpty = { at, auth: member.auth };
+      }
     }
 
     const value = total();
@@ -288,5 +311,52 @@ export function forecastPool(
     points.push({ at, value });
   }
 
-  return { points, emptyAtMs, nextReset };
+  return { points, emptyAtMs, firstEmpty, nextReset, resets: mergeResets(gains, points) };
+}
+
+/** Resets that land in the same forecast step read as one jump on the chart. */
+function mergeResets(
+  gains: readonly { at: number; gain: number }[],
+  points: readonly ChartPoint[]
+): ForecastReset[] {
+  const byStep = new Map<number, number>();
+  for (const { at, gain } of gains) {
+    const step = points.find((point) => point.at >= at)?.at ?? at;
+    byStep.set(step, (byStep.get(step) ?? 0) + gain);
+  }
+  return [...byStep.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([at, gain]) => ({
+      at,
+      gain,
+      value: points.find((point) => point.at === at)?.value ?? 0,
+    }));
+}
+
+/**
+ * Rises in a measured pool line: the resets that already happened. Each rise
+ * is measured from the lowest point since the previous rise, so a reset
+ * spread over a few samples still reads as one jump.
+ */
+export function measuredResets(points: readonly ChartPoint[], minRise = 5): ForecastReset[] {
+  const resets: ForecastReset[] = [];
+  let previous: ChartPoint | null = null;
+  for (const point of points) {
+    if (point.value === null) {
+      previous = null;
+      continue;
+    }
+    if (previous?.value != null && point.value - previous.value >= minRise) {
+      const last = resets[resets.length - 1];
+      if (last && last.at === previous.at) {
+        last.at = point.at;
+        last.gain += point.value - previous.value;
+        last.value = point.value;
+      } else {
+        resets.push({ at: point.at, gain: point.value - previous.value, value: point.value });
+      }
+    }
+    previous = point;
+  }
+  return resets;
 }

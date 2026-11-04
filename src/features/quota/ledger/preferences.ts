@@ -5,11 +5,9 @@
 export interface LedgerPreferences {
   view: 'ledger' | 'cards';
   showEmails: boolean;
-  /** Provider whose pool chart is open; empty when all are closed. */
-  pulseExpanded: string;
-  horizon: '1' | '3' | '7';
-  drainBasis: '6h' | '24h' | '7d';
-  drainRange: '24h' | '3d' | '7d';
+  poolView: 'remaining' | 'drain';
+  burnWindow: '1h' | '3h' | '6h';
+  futureUsage: 'same' | 'heavy' | 'light' | 'none';
 }
 
 const STORAGE_KEY = 'quotaPage.ledgerPreferences';

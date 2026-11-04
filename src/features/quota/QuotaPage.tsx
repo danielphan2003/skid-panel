@@ -60,7 +60,8 @@ import {
 } from './ledger/preferences';
 import { ProviderSummaryCards } from './ledger/ProviderSummaryCards';
 import { QuotaLedger } from './ledger/QuotaLedger';
-import { QuotaPulse } from './ledger/QuotaPulse';
+import { PoolBoard } from './ledger/PoolBoard';
+import { credentialLabel } from './ledger/presentation';
 import { useQuotaLedger } from './ledger/useQuotaLedger';
 import styles from './QuotaPage.module.scss';
 
@@ -378,6 +379,13 @@ export function QuotaPage() {
       ),
     [credentialLimits, now, tab]
   );
+  const labelForAuth = useMemo(() => {
+    const files = new Map(entries.map((entry) => [ledgerAuthKey(entry), entry.file]));
+    return (auth: string) => {
+      const file = files.get(auth);
+      return file ? credentialLabel(file, showEmails) : auth;
+    };
+  }, [entries, showEmails]);
   const ledgerGroups = useMemo(() => {
     const limitsByKey = new Map(
       credentialLimits.map((item, index) => [entries[index], item.limits])
@@ -437,12 +445,13 @@ export function QuotaPage() {
           />
         </div>
 
-        <QuotaPulse
+        <PoolBoard
           pools={pools}
           samples={ledger.samples}
           ledgerStatus={ledger.status}
           nowMs={now}
           resolvedTheme={resolvedTheme}
+          labelFor={labelForAuth}
         />
 
         <div className={styles.toolbar}>

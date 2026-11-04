@@ -3,12 +3,13 @@ import type { TFunction } from 'i18next';
 import {
   averageDrain,
   forecastPool,
+  measuredResets,
   poolHistory,
   rollingDrain,
   windowPace,
   type QuotaLedgerSample,
 } from '@/features/quota/ledger/history';
-import { rateCeiling } from '@/features/quota/ledger/chartScale';
+import { dayTicks, rateCeiling } from '@/features/quota/ledger/chartScale';
 import { backInMs, headlineLimitId, quotaLimits } from '@/features/quota/ledger/limits';
 import { buildPools } from '@/features/quota/ledger/pools';
 
@@ -190,7 +191,12 @@ describe('drain rate', () => {
 
 describe('rolling drain', () => {
   test('averages the trailing window at every step and leaves unmeasured steps empty', () => {
-    const samples = [sample('a', 3, 100), sample('a', 2, 90), sample('a', 1, 88), sample('a', 0, 88)];
+    const samples = [
+      sample('a', 3, 100),
+      sample('a', 2, 90),
+      sample('a', 1, 88),
+      sample('a', 0, 88),
+    ];
     const points = rollingDrain(samples, claudeFilter(['a']), NOW - 3 * HOUR, NOW, HOUR, HOUR);
     expect(points.map((point) => point.value)).toEqual([null, 10, 2, 0]);
   });
@@ -240,6 +246,35 @@ describe('forecast', () => {
     ]);
     expect(forecast.nextReset).toEqual({ at: NOW + 4 * HOUR, gain: 100 });
     expect(forecast.emptyAtMs).toBeNull();
+    expect(forecast.firstEmpty).toEqual({ at: NOW + 3 * HOUR, auth: 'soon' });
+    expect(forecast.resets).toEqual([{ at: NOW + 4 * HOUR, gain: 100, value: 190 }]);
+  });
+
+  test('names a credential that is already empty as the first empty, now', () => {
+    const forecast = forecastPool(
+      [
+        { auth: 'spent', remaining: 0, resetAtMs: NOW + 10 * HOUR, periodHours: 168 },
+        { auth: 'full', remaining: 100, resetAtMs: NOW + 90 * HOUR, periodHours: 168 },
+      ],
+      1,
+      NOW,
+      2 * HOUR,
+      HOUR
+    );
+    expect(forecast.firstEmpty).toEqual({ at: NOW, auth: 'spent' });
+  });
+
+  test('without usage, nothing runs dry and resets still refill', () => {
+    const forecast = forecastPool(
+      [{ auth: 'a', remaining: 40, resetAtMs: NOW + 2 * HOUR, periodHours: 168 }],
+      0,
+      NOW,
+      3 * HOUR,
+      HOUR
+    );
+    expect(forecast.emptyAtMs).toBeNull();
+    expect(forecast.firstEmpty).toBeNull();
+    expect(forecast.resets).toEqual([{ at: NOW + 2 * HOUR, gain: 60, value: 100 }]);
   });
 
   test('reports when the pool runs dry', () => {
@@ -252,5 +287,39 @@ describe('forecast', () => {
     );
     expect(forecast.emptyAtMs).toBe(NOW + 2 * HOUR);
     expect(forecast.points.at(-1)?.value).toBe(0);
+  });
+});
+
+describe('measured resets', () => {
+  test('labels each rise once, merging a rise spread over consecutive steps', () => {
+    const point = (hour: number, value: number | null) => ({ at: NOW + hour * HOUR, value });
+    const resets = measuredResets([
+      point(0, 300),
+      point(1, 250),
+      point(2, 300),
+      point(3, 420),
+      point(4, 410),
+      point(5, null),
+      point(6, 500),
+      point(7, 502),
+    ]);
+    expect(resets).toEqual([{ at: NOW + 3 * HOUR, gain: 170, value: 420 }]);
+  });
+});
+
+describe('short burn windows', () => {
+  test('a one-hour window needs only half an hour of history', () => {
+    const samples = [sample('a', 0.5, 80), sample('a', 0, 78)];
+    expect(averageDrain(samples, claudeFilter(['a']), NOW, HOUR)).toBe(4);
+    expect(averageDrain(samples, claudeFilter(['a']), NOW, 24 * HOUR)).toBeNull();
+  });
+});
+
+describe('day axis', () => {
+  test('puts one two-line label at local noon of every day in range', () => {
+    const start = new Date(2099, 0, 5).getTime();
+    const ticks = dayTicks(start, start + 14 * 24 * HOUR, 'en-US');
+    expect(ticks).toHaveLength(14);
+    expect(ticks[0]).toEqual({ at: start + 12 * HOUR, label: 'Mon\n5' });
   });
 });

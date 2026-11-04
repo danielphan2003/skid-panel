@@ -9,7 +9,7 @@
 
 import { useMemo, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import type { ChartPoint } from './history';
-import styles from './QuotaPulse.module.scss';
+import styles from './PoolBoard.module.scss';
 
 const VIEW_WIDTH = 1000;
 const VIEW_HEIGHT = 300;
@@ -19,9 +19,17 @@ export interface ChartTick {
   label: string;
 }
 
+export interface ChartMarker {
+  at: number;
+  value: number;
+  label: string;
+}
+
 export interface TimeChartProps {
   points: ChartPoint[];
   projected?: ChartPoint[];
+  /** Short labels pinned above points, such as the gain of a reset. */
+  markers?: ChartMarker[];
   yMax: number;
   yTicks: { value: number; label: string }[];
   xFrom: number;
@@ -75,7 +83,18 @@ const areaPath = (segments: Segment[]) =>
     .join('');
 
 export function TimeChart(props: TimeChartProps) {
-  const { points, projected = [], yMax, yTicks, xFrom, xTo, xTicks, nowMs, nowLabel } = props;
+  const {
+    points,
+    projected = [],
+    markers = [],
+    yMax,
+    yTicks,
+    xFrom,
+    xTo,
+    xTicks,
+    nowMs,
+    nowLabel,
+  } = props;
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const span = Math.max(1, xTo - xFrom);
@@ -169,6 +188,18 @@ export function TimeChart(props: TimeChartProps) {
           <path className={styles.chartLine} d={solidLine} />
           <path className={styles.chartLineProjected} d={projectedLine} />
         </svg>
+        {markers
+          .filter((marker) => marker.at >= xFrom && marker.at <= xTo)
+          .map((marker) => (
+            <span
+              key={`${marker.at}:${marker.label}`}
+              className={styles.chartMarker}
+              style={{ left: `${xPercent(marker.at)}%`, top: `${yPercent(marker.value)}%` }}
+              aria-hidden="true"
+            >
+              {marker.label}
+            </span>
+          ))}
         {nowMs !== undefined && nowMs >= xFrom && nowMs <= xTo && (
           <div className={styles.chartNow} style={{ left: `${xPercent(nowMs)}%` }}>
             {nowLabel && <span>{nowLabel}</span>}

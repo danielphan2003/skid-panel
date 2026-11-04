@@ -307,6 +307,17 @@ const THEME_CARDS: Array<{
       textMuted: '#9c958d',
     },
   },
+  {
+    key: 'black',
+    labelKey: 'theme.black',
+    colors: {
+      bg: '#000000',
+      card: '#0a0a0a',
+      border: '#262626',
+      text: '#f5f5f5',
+      textMuted: '#737373',
+    },
+  },
 ];
 
 export function MainLayout() {
@@ -1080,7 +1091,7 @@ export function MainLayout() {
             >
               {theme === 'auto'
                 ? headerIcons.autoTheme
-                : theme === 'dark'
+                : theme === 'dark' || theme === 'black'
                   ? headerIcons.moon
                   : theme === 'white'
                     ? headerIcons.whiteTheme

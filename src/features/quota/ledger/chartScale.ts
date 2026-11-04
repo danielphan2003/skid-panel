@@ -67,3 +67,30 @@ export const rateTicks = (ceiling: number) =>
     const value = ceiling * fraction;
     return { value, label: String(value) };
   });
+
+/** Local midnight of the day containing `ms`. */
+export const startOfLocalDay = (ms: number) => {
+  const date = new Date(ms);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+};
+
+/** Moves `ms` by whole local days, so a DST change keeps the clock time. */
+export const addLocalDays = (ms: number, days: number) => {
+  const date = new Date(ms);
+  date.setDate(date.getDate() + days);
+  return date.getTime();
+};
+
+/** One label per local day, at noon: `Thu` over `22`. */
+export function dayTicks(fromMs: number, toMs: number, locale?: string): ChartTick[] {
+  const ticks: ChartTick[] = [];
+  for (let day = startOfLocalDay(fromMs); day < toMs; day = addLocalDays(day, 1)) {
+    const noon = day + 12 * HOUR_MS;
+    if (noon < fromMs || noon > toMs) continue;
+    const date = new Date(day);
+    const weekday = date.toLocaleDateString(locale, { weekday: 'short' });
+    ticks.push({ at: noon, label: `${weekday}\n${date.getDate()}` });
+  }
+  return ticks;
+}
