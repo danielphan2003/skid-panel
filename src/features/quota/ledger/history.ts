@@ -1,0 +1,362 @@
+/**
+ * Quota history: what a pool held over time, how fast it drained, and where
+ * it is heading.
+ *
+ * Pure functions over ledger samples. `now` is always passed in, so every
+ * case is testable without a clock.
+ */
+
+import { HOUR_MS } from '@/utils/time/durations';
+import type { PoolMember } from './pools';
+
+export interface QuotaLedgerSample {
+  at: number;
+  auth: string;
+  provider: string;
+  window: string;
+  /** Percent remaining, 0..100. */
+  remaining: number;
+  resets_at?: number | null;
+}
+
+export interface ChartPoint {
+  at: number;
+  /** Null marks a gap: no trustworthy value at this instant. */
+  value: number | null;
+}
+
+/** Samples further apart than this are a gap, not a measurement. */
+export const MAX_SAMPLE_GAP_MS = 2 * HOUR_MS;
+
+/** A rise larger than rounding noise means the window reset. */
+const RESET_RISE = 0.5;
+
+const DEFAULT_PERIOD_HOURS = 168;
+
+export interface SeriesFilter {
+  provider: string;
+  window: string;
+  auths: readonly string[];
+}
+
+/** Samples of each credential in the filter, oldest first. */
+export function seriesOf(
+  samples: readonly QuotaLedgerSample[],
+  filter: SeriesFilter
+): Map<string, QuotaLedgerSample[]> {
+  const wanted = new Set(filter.auths);
+  const series = new Map<string, QuotaLedgerSample[]>();
+  for (const sample of samples) {
+    if (sample.provider !== filter.provider || sample.window !== filter.window) continue;
+    if (!wanted.has(sample.auth)) continue;
+    const list = series.get(sample.auth) ?? [];
+    list.push(sample);
+    series.set(sample.auth, list);
+  }
+  series.forEach((list) => list.sort((a, b) => a.at - b.at));
+  return series;
+}
+
+/** A credential's remaining percent at `at`, or null when the history does not cover it. */
+function valueAt(list: readonly QuotaLedgerSample[], at: number): number | null {
+  let latest: QuotaLedgerSample | null = null;
+  for (const sample of list) {
+    if (sample.at > at) break;
+    latest = sample;
+  }
+  if (!latest || at - latest.at > MAX_SAMPLE_GAP_MS) return null;
+  if (typeof latest.resets_at === 'number' && latest.resets_at <= at) return 100;
+  return latest.remaining;
+}
+
+/**
+ * The pool's remaining percent at each step of [fromMs, toMs].
+ *
+ * A step is a gap unless every credential with history in the range has a
+ * value there: a partial sum would draw a cliff that never happened.
+ * Credentials without any history are left out entirely.
+ */
+export function poolHistory(
+  samples: readonly QuotaLedgerSample[],
+  filter: SeriesFilter,
+  fromMs: number,
+  toMs: number,
+  stepMs: number
+): ChartPoint[] {
+  const series = [...seriesOf(samples, filter).values()].filter((list) =>
+    list.some((sample) => sample.at >= fromMs - MAX_SAMPLE_GAP_MS && sample.at <= toMs)
+  );
+  const points: ChartPoint[] = [];
+  for (let at = fromMs; at <= toMs; at += stepMs) {
+    if (series.length === 0) {
+      points.push({ at, value: null });
+      continue;
+    }
+    let sum = 0;
+    let complete = true;
+    for (const list of series) {
+      const value = valueAt(list, at);
+      if (value === null) {
+        complete = false;
+        break;
+      }
+      sum += value;
+    }
+    points.push({ at, value: complete ? sum : null });
+  }
+  return points;
+}
+
+interface Consumption {
+  fromMs: number;
+  toMs: number;
+  amount: number;
+}
+
+/** Spending between consecutive samples; resets and gaps contribute nothing. */
+function consumptions(list: readonly QuotaLedgerSample[]): Consumption[] {
+  const result: Consumption[] = [];
+  for (let index = 1; index < list.length; index += 1) {
+    const previous = list[index - 1];
+    const current = list[index];
+    if (current.at - previous.at > MAX_SAMPLE_GAP_MS) continue;
+    if (current.remaining > previous.remaining + RESET_RISE) continue;
+    const resetBetween = typeof previous.resets_at === 'number' && previous.resets_at <= current.at;
+    if (resetBetween) continue;
+    result.push({
+      fromMs: previous.at,
+      toMs: current.at,
+      amount: Math.max(0, previous.remaining - current.remaining),
+    });
+  }
+  return result;
+}
+
+/**
+ * Average pool drain over the trailing window, in percent per hour: all
+ * spending divided by the time any credential was measured. Null until that
+ * time reaches an hour, so a first pair of samples does not read as zero.
+ */
+export function averageDrain(
+  samples: readonly QuotaLedgerSample[],
+  filter: SeriesFilter,
+  nowMs: number,
+  windowMs: number
+): number | null {
+  // A window shorter than two hours needs only half of itself measured.
+  const minMeasuredMs = Math.min(HOUR_MS, windowMs / 2);
+  return drainBetween(intervalsOf(samples, filter), nowMs - windowMs, nowMs, minMeasuredMs);
+}
+
+/**
+ * Pool drain as a trailing average sampled every step, so the line follows
+ * the pace of work instead of jumping between fixed buckets.
+ */
+export function rollingDrain(
+  samples: readonly QuotaLedgerSample[],
+  filter: SeriesFilter,
+  fromMs: number,
+  toMs: number,
+  windowMs: number,
+  stepMs: number
+): ChartPoint[] {
+  const intervals = intervalsOf(samples, filter);
+  const points: ChartPoint[] = [];
+  for (let at = fromMs; at <= toMs; at += stepMs) {
+    points.push({ at, value: drainBetween(intervals, at - windowMs, at, windowMs / 2) });
+  }
+  return points;
+}
+
+/**
+ * Pool drain from the current windows alone: how fast each credential used
+ * its window so far, summed. It needs no history, so a fresh install can
+ * forecast before the ledger has measured anything.
+ */
+export function windowPace(members: readonly PoolMember[], nowMs: number): number | null {
+  let pace: number | null = null;
+  for (const member of members) {
+    if (member.resetAtMs === null || member.resetAtMs <= nowMs) continue;
+    const periodHours = member.periodHours ?? DEFAULT_PERIOD_HOURS;
+    const elapsedHours = periodHours - (member.resetAtMs - nowMs) / HOUR_MS;
+    if (elapsedHours < 1) continue;
+    pace = (pace ?? 0) + (100 - member.remaining) / elapsedHours;
+  }
+  return pace;
+}
+
+const intervalsOf = (samples: readonly QuotaLedgerSample[], filter: SeriesFilter) =>
+  [...seriesOf(samples, filter).values()].flatMap(consumptions);
+
+function drainBetween(
+  intervals: readonly Consumption[],
+  fromMs: number,
+  toMs: number,
+  minMeasuredMs: number
+): number | null {
+  const clipped = intervals
+    .map((interval) => clipInterval(interval, fromMs, toMs))
+    .filter((interval): interval is Consumption => interval !== null);
+  const measuredMs = coveredMs(clipped);
+  if (measuredMs === 0 || measuredMs < minMeasuredMs) return null;
+  const spent = clipped.reduce((sum, interval) => sum + interval.amount, 0);
+  return spent / (measuredMs / HOUR_MS);
+}
+
+function clipInterval(interval: Consumption, fromMs: number, toMs: number): Consumption | null {
+  const start = Math.max(interval.fromMs, fromMs);
+  const end = Math.min(interval.toMs, toMs);
+  if (end <= start) return null;
+  const share = (end - start) / (interval.toMs - interval.fromMs);
+  return { fromMs: start, toMs: end, amount: interval.amount * share };
+}
+
+function coveredMs(intervals: readonly Consumption[]): number {
+  let total = 0;
+  let reachedMs = -Infinity;
+  for (const { fromMs, toMs } of [...intervals].sort((a, b) => a.fromMs - b.fromMs)) {
+    const start = Math.max(fromMs, reachedMs);
+    if (toMs > start) total += toMs - start;
+    reachedMs = Math.max(reachedMs, toMs);
+  }
+  return total;
+}
+
+export interface ForecastReset {
+  at: number;
+  /** Percent the pool gains at this reset. */
+  gain: number;
+  /** Pool remaining right after the reset. */
+  value: number;
+}
+
+export interface PoolForecast {
+  points: ChartPoint[];
+  /** First instant the pool reaches zero inside the horizon. */
+  emptyAtMs: number | null;
+  /** First credential to reach zero inside the horizon. */
+  firstEmpty: { at: number; auth: string } | null;
+  nextReset: { at: number; gain: number } | null;
+  /** Every reset inside the horizon that gains at least rounding noise, oldest first. */
+  resets: ForecastReset[];
+}
+
+interface SimulatedMember {
+  auth: string;
+  remaining: number;
+  resetAtMs: number | null;
+  periodMs: number;
+}
+
+/**
+ * Project the pool forward at a constant drain.
+ *
+ * The proxy fills one credential at a time, starting with the one whose
+ * window resets first, so the drain is taken from that credential until it is
+ * empty. Each credential jumps back to 100% when its window resets and starts
+ * a new window of the same length.
+ */
+export function forecastPool(
+  members: readonly PoolMember[],
+  drainPerHour: number,
+  nowMs: number,
+  horizonMs: number,
+  stepMs: number
+): PoolForecast {
+  const simulated: SimulatedMember[] = members.map((member) => ({
+    auth: member.auth,
+    remaining: member.remaining,
+    resetAtMs: member.resetAtMs,
+    periodMs: (member.periodHours ?? DEFAULT_PERIOD_HOURS) * HOUR_MS,
+  }));
+  const total = () => simulated.reduce((sum, member) => sum + member.remaining, 0);
+  const points: ChartPoint[] = [{ at: nowMs, value: total() }];
+  let emptyAtMs: number | null = total() <= 0 ? nowMs : null;
+  const emptyNow = simulated.find((member) => member.remaining <= 0);
+  let firstEmpty: PoolForecast['firstEmpty'] = emptyNow ? { at: nowMs, auth: emptyNow.auth } : null;
+  let nextReset: PoolForecast['nextReset'] = null;
+  const gains: { at: number; gain: number }[] = [];
+  const drainPerStep = Math.max(0, drainPerHour) * (stepMs / HOUR_MS);
+
+  for (let at = nowMs + stepMs; at <= nowMs + horizonMs; at += stepMs) {
+    for (const member of simulated) {
+      while (member.resetAtMs !== null && member.resetAtMs <= at) {
+        const gain = 100 - member.remaining;
+        const resetAt = Math.max(member.resetAtMs, nowMs);
+        if (gain >= RESET_RISE) {
+          gains.push({ at: resetAt, gain });
+          if (nextReset === null || resetAt < nextReset.at) nextReset = { at: resetAt, gain };
+        }
+        member.remaining = 100;
+        member.resetAtMs += member.periodMs;
+      }
+    }
+
+    let drain = drainPerStep;
+    const fillOrder = [...simulated].sort(
+      (a, b) => (a.resetAtMs ?? Infinity) - (b.resetAtMs ?? Infinity)
+    );
+    for (const member of fillOrder) {
+      if (drain <= 0) break;
+      const taken = Math.min(member.remaining, drain);
+      member.remaining -= taken;
+      drain -= taken;
+      if (firstEmpty === null && taken > 0 && member.remaining <= 0) {
+        firstEmpty = { at, auth: member.auth };
+      }
+    }
+
+    const value = total();
+    if (emptyAtMs === null && value <= 0) emptyAtMs = at;
+    points.push({ at, value });
+  }
+
+  return { points, emptyAtMs, firstEmpty, nextReset, resets: mergeResets(gains, points) };
+}
+
+/** Resets that land in the same forecast step read as one jump on the chart. */
+function mergeResets(
+  gains: readonly { at: number; gain: number }[],
+  points: readonly ChartPoint[]
+): ForecastReset[] {
+  const byStep = new Map<number, number>();
+  for (const { at, gain } of gains) {
+    const step = points.find((point) => point.at >= at)?.at ?? at;
+    byStep.set(step, (byStep.get(step) ?? 0) + gain);
+  }
+  return [...byStep.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([at, gain]) => ({
+      at,
+      gain,
+      value: points.find((point) => point.at === at)?.value ?? 0,
+    }));
+}
+
+/**
+ * Rises in a measured pool line: the resets that already happened. Each rise
+ * is measured from the lowest point since the previous rise, so a reset
+ * spread over a few samples still reads as one jump.
+ */
+export function measuredResets(points: readonly ChartPoint[], minRise = 5): ForecastReset[] {
+  const resets: ForecastReset[] = [];
+  let previous: ChartPoint | null = null;
+  for (const point of points) {
+    if (point.value === null) {
+      previous = null;
+      continue;
+    }
+    if (previous?.value != null && point.value - previous.value >= minRise) {
+      const last = resets[resets.length - 1];
+      if (last && last.at === previous.at) {
+        last.at = point.at;
+        last.gain += point.value - previous.value;
+        last.value = point.value;
+      } else {
+        resets.push({ at: point.at, gain: point.value - previous.value, value: point.value });
+      }
+    }
+    previous = point;
+  }
+  return resets;
+}

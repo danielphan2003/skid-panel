@@ -16,7 +16,8 @@ export interface PolicyPanelProps {
 }
 
 function StrategyMark({ strategy }: { strategy: RoutingStrategy }) {
-  // Three dots: even (round-robin), graded (weighted), first one filled (fill-first).
+  // Three dots: even (round-robin), graded (weighted), first one filled (fill-first and
+  // soonest-reset).
   const opacities =
     strategy === 'round-robin'
       ? [1, 1, 1]

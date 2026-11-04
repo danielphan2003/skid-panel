@@ -9,7 +9,8 @@ import type { Theme } from '@/types';
 import { STORAGE_KEY_THEME } from '@/utils/constants';
 
 type ResolvedTheme = 'light' | 'dark';
-type AppliedTheme = ResolvedTheme | 'white';
+// `black` is the dark theme on pure black surfaces (styles/black.scss).
+type AppliedTheme = ResolvedTheme | 'white' | 'black';
 
 interface ThemeState {
   theme: Theme;
@@ -30,7 +31,7 @@ const resolveAutoTheme = (): AppliedTheme => {
 };
 
 const normalizeResolvedTheme = (theme: AppliedTheme): ResolvedTheme => {
-  return theme === 'dark' ? 'dark' : 'light';
+  return theme === 'dark' || theme === 'black' ? 'dark' : 'light';
 };
 
 const resolveTheme = (theme: Theme): AppliedTheme => {
@@ -44,7 +45,13 @@ const resolveTheme = (theme: Theme): AppliedTheme => {
 };
 
 const applyTheme = (resolved: AppliedTheme) => {
-  if (resolved === 'dark') {
+  if (resolved === 'black') {
+    document.documentElement.setAttribute('data-surface', 'black');
+  } else {
+    document.documentElement.removeAttribute('data-surface');
+  }
+
+  if (resolved === 'dark' || resolved === 'black') {
     document.documentElement.setAttribute('data-theme', 'dark');
     return;
   }
