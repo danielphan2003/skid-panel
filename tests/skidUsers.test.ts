@@ -229,3 +229,22 @@ describe('account sessions', () => {
     }
   });
 });
+
+describe('account generations across page mounts', () => {
+  test('a newer sign-in outdates an older one, whichever page mount started it', async () => {
+    const { beginAccountChange, noteAccountGeneration } =
+      await import('../src/services/api/skidAccount');
+    // Mount 1 starts verifying link A; the page is left and opened again.
+    const signInA = beginAccountChange();
+    // Mount 2 loads the account, then starts verifying link B.
+    const loadInMount2 = noteAccountGeneration();
+    const signInB = beginAccountChange();
+    expect(signInB()).toBe(true);
+    expect(signInA()).toBe(false); // A resolving after B is dropped
+    expect(loadInMount2()).toBe(false);
+    // Signing out outdates B in turn.
+    const signOut = beginAccountChange();
+    expect(signInB()).toBe(false);
+    expect(signOut()).toBe(true);
+  });
+});

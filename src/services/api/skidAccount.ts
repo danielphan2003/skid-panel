@@ -38,6 +38,23 @@ export class AccountApiError extends Error {
   }
 }
 
+// Counts sign-ins and sign-outs across every mount of the account page, so an
+// answer to an older one is dropped even after the page was left and opened
+// again.
+let accountGeneration = 0;
+
+/** Starts a sign-in or sign-out; the returned check is true while it is the newest. */
+export function beginAccountChange(): () => boolean {
+  const mine = ++accountGeneration;
+  return () => mine === accountGeneration;
+}
+
+/** Notes the current generation; the returned check is true until a sign-in or sign-out starts. */
+export function noteAccountGeneration(): () => boolean {
+  const seen = accountGeneration;
+  return () => seen === accountGeneration;
+}
+
 export const accountSession = {
   get: (): string => obfuscatedStorage.getItem<string>(SESSION_STORAGE_KEY) ?? '',
   set: (session: string) => obfuscatedStorage.setItem(SESSION_STORAGE_KEY, session),

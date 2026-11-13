@@ -8,6 +8,8 @@ import {
   AccountApiError,
   AccountSignedOutError,
   accountSession,
+  beginAccountChange,
+  noteAccountGeneration,
   skidAccountApi,
 } from '@/services/api/skidAccount';
 import { UsagePanel, WindowMeters } from './components/bits';
@@ -29,9 +31,6 @@ export function AccountPage() {
   const [user, setUser] = useState<SkidUser | null>(null);
   const [notice, setNotice] = useState('');
   const verifying = useRef('');
-  // Bumped by every sign-in and sign-out: an answer to an older request is
-  // dropped, so it can neither show the previous account nor sign out a new one.
-  const generation = useRef(0);
 
   const signedOut = useCallback((message = '') => {
     setUser(null);
@@ -40,14 +39,14 @@ export function AccountPage() {
   }, []);
 
   const loadMe = useCallback(async () => {
-    const started = generation.current;
+    const current = noteAccountGeneration();
     try {
       const me = await skidAccountApi.me();
-      if (started !== generation.current) return;
+      if (!current()) return;
       setUser(me);
       setPhase('signed-in');
     } catch (err) {
-      if (started !== generation.current) return;
+      if (!current()) return;
       if (err instanceof AccountSignedOutError) signedOut();
       else signedOut(err instanceof Error ? err.message : String(err));
     }
@@ -64,7 +63,9 @@ export function AccountPage() {
     }
     if (verifying.current === token) return;
     verifying.current = token;
-    const started = ++generation.current;
+    // Every answer to an older sign-in or sign-out is dropped from here on,
+    // in this mount of the page or any other.
+    const current = beginAccountChange();
     // An old session must not race the new one.
     accountSession.clear();
     // The token is single-use: take it out of the address bar right away.
@@ -72,7 +73,7 @@ export function AccountPage() {
     skidAccountApi
       .verify(token)
       .then(({ session, user: u }) => {
-        if (started !== generation.current) return;
+        if (!current()) return;
         accountSession.set(session);
         setUser(u);
         setPhase('signed-in');
@@ -81,7 +82,7 @@ export function AccountPage() {
         verifying.current = '';
       })
       .catch((err: unknown) => {
-        if (started !== generation.current) return;
+        if (!current()) return;
         signedOut(
           err instanceof AccountApiError && err.status === 401
             ? t('account.link_expired')
@@ -99,9 +100,9 @@ export function AccountPage() {
       user={user}
       onChanged={() => void loadMe()}
       onSignOut={() => {
-        const started = ++generation.current;
+        const current = beginAccountChange();
         void skidAccountApi.logout().finally(() => {
-          if (started === generation.current) signedOut(t('account.signed_out'));
+          if (current()) signedOut(t('account.signed_out'));
         });
       }}
       onSignedOut={() => signedOut(t('account.session_ended'))}
