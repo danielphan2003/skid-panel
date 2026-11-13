@@ -98,22 +98,28 @@ export const skidAccountApi = {
     return typeof status === 'string' ? status : '';
   },
 
-  async verify(token: string): Promise<SkidUser> {
+  /**
+   * Redeems a magic link. The caller stores the session (accountSession.set)
+   * only if the sign-in is still the newest one, so an older link finishing
+   * last cannot swap the account under the page.
+   */
+  async verify(token: string): Promise<{ session: string; user: SkidUser }> {
     const data = await call('POST', '/auth/verify', { token }, false);
     const session = (data as { session?: unknown } | null)?.session;
     const user = normalizeUser((data as { user?: unknown } | null)?.user);
     if (typeof session !== 'string' || !session || !user) {
       throw new AccountApiError('invalid sign-in response', 500);
     }
-    accountSession.set(session);
-    return user;
+    return { session, user };
   },
 
+  /** Signs out the stored session, and forgets it unless a newer one replaced it. */
   async logout(): Promise<void> {
+    const session = accountSession.get();
     try {
       await call('POST', '/auth/logout');
     } finally {
-      accountSession.clear();
+      if (accountSession.get() === session) accountSession.clear();
     }
   },
 

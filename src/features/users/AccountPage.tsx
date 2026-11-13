@@ -71,8 +71,9 @@ export function AccountPage() {
     navigate('/account', { replace: true });
     skidAccountApi
       .verify(token)
-      .then((u) => {
+      .then(({ session, user: u }) => {
         if (started !== generation.current) return;
+        accountSession.set(session);
         setUser(u);
         setPhase('signed-in');
       })
@@ -98,8 +99,10 @@ export function AccountPage() {
       user={user}
       onChanged={() => void loadMe()}
       onSignOut={() => {
-        generation.current += 1;
-        void skidAccountApi.logout().finally(() => signedOut(t('account.signed_out')));
+        const started = ++generation.current;
+        void skidAccountApi.logout().finally(() => {
+          if (started === generation.current) signedOut(t('account.signed_out'));
+        });
       }}
       onSignedOut={() => signedOut(t('account.session_ended'))}
     />

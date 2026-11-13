@@ -168,3 +168,64 @@ describe('limit editing', () => {
     expect(normalizeKey({ id: 'k' })?.adminDisabled).toBe(false);
   });
 });
+
+describe('account sessions', () => {
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const originalFetch = globalThis.fetch;
+  let values: Map<string, string>;
+
+  const useMemoryStorage = () => {
+    values = new Map();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+        removeItem: (key: string) => values.delete(key),
+      },
+    });
+  };
+  const restore = () => {
+    globalThis.fetch = originalFetch;
+    if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
+    else Reflect.deleteProperty(globalThis, 'localStorage');
+  };
+
+  test('verifying a link stores nothing: the page decides', async () => {
+    useMemoryStorage();
+    try {
+      const { accountSession, skidAccountApi } = await import('../src/services/api/skidAccount');
+      globalThis.fetch = (async () =>
+        new Response(
+          JSON.stringify({
+            session: 'skid-session-b',
+            user: { id: 'u_1', email: 'a@example.com' },
+          }),
+          { status: 200 }
+        )) as unknown as typeof fetch;
+      const result = await skidAccountApi.verify('token');
+      expect(result.session).toBe('skid-session-b');
+      expect(accountSession.get()).toBe('');
+    } finally {
+      restore();
+    }
+  });
+
+  test('signing out never forgets a newer session', async () => {
+    useMemoryStorage();
+    try {
+      const { accountSession, skidAccountApi } = await import('../src/services/api/skidAccount');
+      accountSession.set('skid-session-a');
+      let answer: (r: Response) => void = () => undefined;
+      globalThis.fetch = (() =>
+        new Promise<Response>((resolve) => (answer = resolve))) as unknown as typeof fetch;
+      const pending = skidAccountApi.logout();
+      accountSession.set('skid-session-b'); // a magic link signed in meanwhile
+      answer(new Response(null, { status: 204 }));
+      await pending;
+      expect(accountSession.get()).toBe('skid-session-b');
+    } finally {
+      restore();
+    }
+  });
+});
