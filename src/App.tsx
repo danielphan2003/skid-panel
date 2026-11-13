@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Outlet, RouterProvider, createHashRouter } from 'react-router-dom';
 import { LoginPage } from '@/pages/LoginPage';
+import { AccountPage } from '@/features/users/AccountPage';
 import { NotificationContainer } from '@/components/common/NotificationContainer';
 import { ConfirmationModal } from '@/components/common/ConfirmationModal';
 import { LoginRevealVeil } from '@/components/common/LoginRevealVeil';
@@ -48,6 +49,8 @@ const router = createHashRouter([
     children: [
       ...devPreviewRoutes,
       { path: '/login', element: <LoginPage /> },
+      // skid users sign in by email here, without the management key.
+      { path: '/account', element: <AccountPage /> },
       {
         path: '/*',
         element: (
