@@ -2613,7 +2613,9 @@
     "secret_copied": "Copied",
     "secret_done": "I copied it",
     "secret_setup": "Set a machine up with it (the script asks for the key):",
-    "scope_add_model": "Add {{model}} to the models"
+    "scope_add_model": "Add {{model}} to the models",
+    "key_admin_disabled": "turned off by the admin",
+    "key_user_disabled": "turned off by its user"
   },
   "account": {
     "user_sign_in": "Not the admin? Sign in with your email",

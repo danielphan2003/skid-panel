@@ -50,6 +50,8 @@ export interface SkidKey {
   createdAt: string;
   lastUsedAt: string;
   disabled: boolean;
+  /** Turned off by skid's admin; the key's user cannot turn it back on. */
+  adminDisabled: boolean;
   scope: Scope | null;
   limits: Limits;
   machine: Machine | null;
@@ -197,6 +199,7 @@ export function normalizeKey(value: unknown): SkidKey | null {
     createdAt: str(value.created_at),
     lastUsedAt: str(value.last_used_at),
     disabled: value.disabled === true,
+    adminDisabled: value.admin_disabled === true,
     scope: normalizeScope(value.scope),
     limits: normalizeLimits(value.limits),
     machine: normalizeMachine(value.machine),
@@ -282,6 +285,16 @@ export function serializeUserPatch(patch: UserPatch): Json {
   if (patch.limits) out.limits = patch.limits;
   return out;
 }
+
+/** Limits as editable text. */
+export type LimitsDraft = Record<keyof Limits, string>;
+
+/** Exact numbers, so saving never rounds a limit that was not touched. */
+export const limitsDraft = (l: Limits): LimitsDraft => ({
+  daily: l.daily ? String(l.daily) : '',
+  weekly: l.weekly ? String(l.weekly) : '',
+  monthly: l.monthly ? String(l.monthly) : '',
+});
 
 /** Quota tokens: everything but cache reads. */
 export const quotaTokens = (b: UsageBucket): number => b.input + b.cacheWrite + b.output;

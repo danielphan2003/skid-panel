@@ -153,3 +153,18 @@ describe('skid users model', () => {
     expect(splitList('a, b\nc,,')).toEqual(['a', 'b', 'c']);
   });
 });
+
+describe('limit editing', () => {
+  test('an untouched limit saves back exactly', async () => {
+    const { limitsDraft } = await import('../src/features/users/model');
+    const draft = limitsDraft({ daily: 12345, weekly: 10500000, monthly: 0 });
+    expect(parseTokens(draft.daily)).toBe(12345);
+    expect(parseTokens(draft.weekly)).toBe(10500000);
+    expect(parseTokens(draft.monthly)).toBe(0);
+  });
+
+  test('the admin flag is read', () => {
+    expect(normalizeKey({ id: 'k', admin_disabled: true })?.adminDisabled).toBe(true);
+    expect(normalizeKey({ id: 'k' })?.adminDisabled).toBe(false);
+  });
+});

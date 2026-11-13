@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/icons';
 import { apiKeysApi } from '@/services/api/apiKeys';
 import { skidUsersApi } from '@/services/api/skidUsers';
-import { useNotificationStore } from '@/stores';
+import { useConfigStore, useNotificationStore } from '@/stores';
 import { UsagePanel, WindowMeters } from './components/bits';
 import { UserEditorModal } from './components/editors';
 import { KeysSection, type KeyOps } from './components/KeysSection';
@@ -222,6 +222,7 @@ function UserDetail({
   return (
     <div className={styles.detail}>
       <KeysSection
+        asAdmin
         keys={user.keys}
         models={models}
         ops={ops}
@@ -266,6 +267,11 @@ function ImportKeyModal({
     setFailure('');
     try {
       await skidUsersApi.importKey(user.id, choice, name.trim() ? { name: name.trim() } : {});
+      // The key left config.yaml: the cached config must not list it.
+      void useConfigStore
+        .getState()
+        .fetchConfig(true)
+        .catch(() => undefined);
       onImported();
     } catch (err) {
       setFailure(errorText(err));

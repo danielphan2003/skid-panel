@@ -51,8 +51,8 @@ async function call(
   auth: boolean = true
 ): Promise<unknown> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const session = auth ? accountSession.get() : '';
   if (auth) {
-    const session = accountSession.get();
     if (!session) throw new AccountSignedOutError();
     headers.Authorization = `Bearer ${session}`;
   }
@@ -62,7 +62,9 @@ async function call(
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (response.status === 401 && auth) {
-    accountSession.clear();
+    // Only the session this request sent: a newer sign-in must survive an
+    // older request's refusal.
+    if (accountSession.get() === session) accountSession.clear();
     throw new AccountSignedOutError();
   }
   const text = await response.text();

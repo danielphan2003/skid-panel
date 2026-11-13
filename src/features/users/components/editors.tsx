@@ -10,12 +10,13 @@ import {
   WINDOW_NAMES,
   emptyLimits,
   emptyScope,
-  formatTokens,
+  limitsDraft,
   parseTokens,
   scopeIsEmpty,
   splitList,
   type KeyPatch,
   type Limits,
+  type LimitsDraft,
   type MachineKind,
   type ModelOption,
   type Scope,
@@ -47,14 +48,6 @@ const scopeFromDraft = (d: ScopeDraft): Scope => ({
   models: splitList(d.models),
   excludedProviders: splitList(d.excludedProviders),
   excludedModels: splitList(d.excludedModels),
-});
-
-type LimitsDraft = Record<keyof Limits, string>;
-
-const limitsDraft = (l: Limits): LimitsDraft => ({
-  daily: l.daily ? formatTokens(l.daily) : '',
-  weekly: l.weekly ? formatTokens(l.weekly) : '',
-  monthly: l.monthly ? formatTokens(l.monthly) : '',
 });
 
 function ScopeFields({

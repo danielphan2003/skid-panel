@@ -49,12 +49,16 @@ export function AccountPage() {
   useEffect(() => {
     const token = tokenFromSearch(location.search);
     if (!token) {
+      // A sign-in from a link is still being checked.
+      if (verifying.current) return;
       if (accountSession.get()) void loadMe();
       else signedOut();
       return;
     }
     if (verifying.current === token) return;
     verifying.current = token;
+    // An old session must not race the new one.
+    accountSession.clear();
     // The token is single-use: take it out of the address bar right away.
     navigate('/account', { replace: true });
     skidAccountApi
@@ -62,6 +66,9 @@ export function AccountPage() {
       .then((u) => {
         setUser(u);
         setPhase('signed-in');
+      })
+      .finally(() => {
+        verifying.current = '';
       })
       .catch((err: unknown) =>
         signedOut(

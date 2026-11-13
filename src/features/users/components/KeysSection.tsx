@@ -25,12 +25,15 @@ export function KeysSection({
   ops,
   onChanged,
   extraActions,
+  asAdmin = false,
 }: {
   keys: SkidKey[];
   models: ModelOption[];
   ops: KeyOps;
   onChanged: () => void;
   extraActions?: React.ReactNode;
+  /** The admin's switch is the admin flag; the user's is their own. */
+  asAdmin?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const showNotification = useNotificationStore((s) => s.showNotification);
@@ -87,7 +90,10 @@ export function KeysSection({
       </div>
       {keys.length === 0 && <div className={styles.muted}>{t('users.keys_empty')}</div>}
       {keys.map((k) => (
-        <div key={k.id} className={k.disabled ? styles.keyRowDisabled : styles.keyRow}>
+        <div
+          key={k.id}
+          className={k.disabled || k.adminDisabled ? styles.keyRowDisabled : styles.keyRow}
+        >
           <div className={styles.keyMain}>
             <div className={styles.keyTitle}>
               <strong>{k.name || t('users.key_unnamed')}</strong>
@@ -100,11 +106,16 @@ export function KeysSection({
                 : t('users.key_never_used')}
               {k.scope ? ` · ${t('users.key_scoped')}` : ''}
             </div>
+            {k.adminDisabled && <span className={styles.tag}>{t('users.key_admin_disabled')}</span>}
+            {asAdmin && k.disabled && (
+              <span className={styles.tag}>{t('users.key_user_disabled')}</span>
+            )}
           </div>
           <WindowMeters windows={k.windows} />
           <div className={styles.keyActions}>
             <ToggleSwitch
-              checked={!k.disabled}
+              checked={asAdmin ? !k.adminDisabled : !k.disabled && !k.adminDisabled}
+              disabled={!asAdmin && k.adminDisabled}
               onChange={(value) => void toggle(k, value)}
               ariaLabel={t('users.key_enabled')}
             />
