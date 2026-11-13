@@ -29,6 +29,9 @@ export function AccountPage() {
   const [user, setUser] = useState<SkidUser | null>(null);
   const [notice, setNotice] = useState('');
   const verifying = useRef('');
+  // Bumped by every sign-in and sign-out: an answer to an older request is
+  // dropped, so it can neither show the previous account nor sign out a new one.
+  const generation = useRef(0);
 
   const signedOut = useCallback((message = '') => {
     setUser(null);
@@ -37,10 +40,14 @@ export function AccountPage() {
   }, []);
 
   const loadMe = useCallback(async () => {
+    const started = generation.current;
     try {
-      setUser(await skidAccountApi.me());
+      const me = await skidAccountApi.me();
+      if (started !== generation.current) return;
+      setUser(me);
       setPhase('signed-in');
     } catch (err) {
+      if (started !== generation.current) return;
       if (err instanceof AccountSignedOutError) signedOut();
       else signedOut(err instanceof Error ? err.message : String(err));
     }
@@ -57,6 +64,7 @@ export function AccountPage() {
     }
     if (verifying.current === token) return;
     verifying.current = token;
+    const started = ++generation.current;
     // An old session must not race the new one.
     accountSession.clear();
     // The token is single-use: take it out of the address bar right away.
@@ -64,21 +72,23 @@ export function AccountPage() {
     skidAccountApi
       .verify(token)
       .then((u) => {
+        if (started !== generation.current) return;
         setUser(u);
         setPhase('signed-in');
       })
       .finally(() => {
         verifying.current = '';
       })
-      .catch((err: unknown) =>
+      .catch((err: unknown) => {
+        if (started !== generation.current) return;
         signedOut(
           err instanceof AccountApiError && err.status === 401
             ? t('account.link_expired')
             : err instanceof Error
               ? err.message
               : String(err)
-        )
-      );
+        );
+      });
   }, [location.search, loadMe, navigate, signedOut, t]);
 
   if (phase === 'loading') return <div className={styles.accountShell} aria-busy="true" />;
@@ -88,6 +98,7 @@ export function AccountPage() {
       user={user}
       onChanged={() => void loadMe()}
       onSignOut={() => {
+        generation.current += 1;
         void skidAccountApi.logout().finally(() => signedOut(t('account.signed_out')));
       }}
       onSignedOut={() => signedOut(t('account.session_ended'))}
