@@ -355,3 +355,10 @@
     opacity: 0.6;
   }
 }
+
+// skid users sign in by email on #/account.
+.accountLink {
+  align-self: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}

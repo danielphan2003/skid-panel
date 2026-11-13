@@ -306,6 +306,9 @@ export function LoginPage() {
                 onRememberPasswordChange={setRememberPassword}
                 onSubmit={handleSubmit}
               />
+              <a className={styles.accountLink} href="#/account">
+                {t('account.user_sign_in')}
+              </a>
             </div>
           )}
         </main>
