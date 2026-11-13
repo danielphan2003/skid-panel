@@ -83,12 +83,20 @@ export function UsersPage() {
     });
 
   const copyLink = async (u: SkidUser) => {
+    let url: string;
     try {
-      const url = await skidUsersApi.signInLink(u.id);
-      await navigator.clipboard.writeText(url);
-      showNotification(t('users.link_copied'), 'success');
+      url = await skidUsersApi.signInLink(u.id);
     } catch (err) {
       showNotification(errorText(err), 'error');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      showNotification(t('users.link_copied'), 'success');
+    } catch {
+      // Some browsers refuse the clipboard after an await: show the link so
+      // the one just made is not lost.
+      window.prompt(t('users.link_copy_manual'), url);
     }
   };
 

@@ -2635,7 +2635,8 @@
     "secret_setup": "Set a machine up with it (the script asks for the key):",
     "scope_add_model": "Add {{model}} to the models",
     "key_admin_disabled": "turned off by the admin",
-    "key_user_disabled": "turned off by its user"
+    "key_user_disabled": "turned off by its user",
+    "link_copy_manual": "Copy this sign-in link. It works once, for 15 minutes:"
   },
   "account": {
     "user_sign_in": "Not the admin? Sign in with your email",
